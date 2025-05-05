@@ -1,4 +1,4 @@
-![Logo](./logo.svg){ height="40" }
+![Logo](./logo.svg)
 
 # Loan Portfolio Insights with MongoDB Atlas & n8n
 
@@ -320,6 +320,6 @@ _Reference:_ [Vector Search Types](https://www.mongodb.com/docs/atlas/atlas-vect
 
 ---
 
-![Logo](./logo.svg){ height="30" }
+![Logo](./logo.svg)
 sangram.mohite@mongodb.com
 [![github-logo](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/coder-pikachu)
