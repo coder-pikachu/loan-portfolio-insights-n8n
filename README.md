@@ -321,6 +321,5 @@ _Reference:_ [Vector Search Types](https://www.mongodb.com/docs/atlas/atlas-vect
 
 ---
 
-![Logo](./logo.svg)
 sangram.mohite@mongodb.com
 [![github-logo](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/coder-pikachu)
