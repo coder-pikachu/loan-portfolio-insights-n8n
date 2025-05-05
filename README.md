@@ -1,4 +1,5 @@
-![Logo](./logo.svg)
+![<img src="./logo.svg" height="50"/>](./logo.svg)
+
 
 # Loan Portfolio Insights with MongoDB Atlas & n8n
 
