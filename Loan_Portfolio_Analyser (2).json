@@ -1,0 +1,531 @@
+{
+  "name": "Loan Portfolio Analyser",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "dimensions": 1536
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        288,
+        140
+      ],
+      "id": "f7e21ddd-33c6-4595-8d53-ea459549b797",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "AiCHqXvpYew3IjRj",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "public": true,
+        "authentication": "basicAuth",
+        "initialMessages": "Hi there! 👋\nI am your Loan Portfolio Assistant. You can ask me things like - \n\nFind all loans by applicants named Aarav.\n\nShow me loans where sector is Retail.\n\nHow many loans were disbursed monthly?\n\nAnalyze payment behavior for loan 67ab78bdd91f2b71d9687f91.\n\nShow me monthly loan disbursement and applicants from Retail sector.\n",
+        "options": {
+          "subtitle": "I am your personal Loan Insights Explorer!",
+          "title": "Welcome!"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -260,
+        -280
+      ],
+      "id": "520c5a63-31d6-4835-b7b2-f2871833dbcf",
+      "name": "When chat message received",
+      "webhookId": "98c1f289-3987-47c0-aefe-41eaec725cdc",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "RjjBJVh52K48Md3l",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "{{ $json.thread_id || $json.chatId }}",
+        "databaseName": "n8n"
+      },
+      "id": "f67e7fb0-5cdd-4fe0-99e7-44a6df56ee58",
+      "name": "MongoDB Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryMongoDbChat",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -60
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "gaTIP4YEnVdTifNs",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "semantic_loan_explorer",
+        "toolDescription": "AI-powered natural language search through loan applications using vector embeddings - finds contextually similar loans based on analyst notes and descriptions\n- Should not be used to query loans based on fields like _id. Strictly used for similarity search and not exact queries.",
+        "mongoCollection": {
+          "__rl": true,
+          "value": "loan_applications_demo",
+          "mode": "list"
+        },
+        "embedding": "metadata.vector_embedding",
+        "metadata_field": "metadata.analyst_notes",
+        "vectorIndexName": "vector_index",
+        "options": {}
+      },
+      "id": "543e9a27-ed3b-4444-9fe4-d674fe123863",
+      "name": "Semantic Loan Explorer",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreMongoDBAtlas",
+      "typeVersion": 1,
+      "position": [
+        200,
+        -57.5
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "gaTIP4YEnVdTifNs",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-haiku-20241022",
+        "options": {}
+      },
+      "id": "d4fb8e07-201a-4058-a537-97c4bd09aec6",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -60
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "kEv927GPLofx9QDh",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Portfolio Health Dashboard Tool",
+        "operation": "aggregate",
+        "collection": "loan_applications_demo",
+        "query": "[\n  {\n    \"$unwind\": \"$performance_data.payment_history\"\n  },\n  {\n    \"$group\": {\n      \"_id\": null,\n      \"total_payments\": { \"$sum\": 1 },\n      \"on_time_payments\": {\n        \"$sum\": {\n          \"$cond\": [\n            { \"$eq\": [\"$performance_data.payment_history.status\", \"on_time\"] },\n            1,\n            0\n          ]\n        }\n      },\n      \"delayed_payments\": {\n        \"$sum\": {\n          \"$cond\": [\n            { \"$eq\": [\"$performance_data.payment_history.status\", \"delayed\"] },\n            1,\n            0\n          ]\n        }\n      }\n    }\n  },\n  {\n    \"$project\": {\n      \"_id\": 0,\n      \"total_payments\": 1,\n      \"on_time_payments\": 1,\n      \"delayed_payments\": 1,\n      \"on_time_rate\": {\n        \"$divide\": [\"$on_time_payments\", \"$total_payments\"]\n      },\n      \"delayed_rate\": {\n        \"$divide\": [\"$delayed_payments\", \"$total_payments\"]\n      }\n    }\n  }\n]"
+      },
+      "type": "n8n-nodes-base.mongoDbTool",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        -60
+      ],
+      "id": "e0f40a9a-0d95-4018-88dc-d7dd92019520",
+      "name": "Portfolio Health Dashboard Tool",
+      "credentials": {
+        "mongoDb": {
+          "id": "gaTIP4YEnVdTifNs",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Identifies potentially problematic loans by filtering for risk scores above a specified threshold - essential for early intervention and risk management",
+        "collection": "=loan_applications_demo",
+        "options": {
+          "limit": 5,
+          "projection": "{\n  \"applicant_details.name\": 1,\n  \"applicant_details.age\": 1,\n  \"applicant_details.credit_score\": 1,\n  \"applicant_details.occupation\": 1,\n  \"loan_details.amount\": 1,\n  \"risk_metrics.risk_score\": 1,\n  \"application_status\": 1\n}"
+        },
+        "query": "{\n  \"risk_metrics.risk_score\": {\n    \"$gt\": 5\n  }\n}"
+      },
+      "type": "n8n-nodes-base.mongoDbTool",
+      "typeVersion": 1.1,
+      "position": [
+        616,
+        -60
+      ],
+      "id": "17b414fa-8ccf-4275-91b0-09bcde23f6fd",
+      "name": "High-Risk Loan Detector Tool",
+      "credentials": {
+        "mongoDb": {
+          "id": "gaTIP4YEnVdTifNs",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "We want a single loan document by Loan ID.",
+        "collection": "loan_applications_demo",
+        "options": {
+          "limit": 1,
+          "projection": "{\n  \"applicant_details.name\": 1,\n  \"applicant_details.occupation\": 1,\n  \"applicant_details.monthly_income\": 1,\n  \"applicant_details.credit_score\": 1,\n  \"loan_details.amount\": 1,\n  \"loan_details.tenure\": 1,\n  \"loan_details.interest_rate\": 1,\n  \"loan_details.purpose\": 1,\n  \"risk_metrics.risk_score\": 1,\n  \"application_status\": 1\n}"
+        },
+        "query": "={\n  \"_id\": \"{{ $fromAI('loan_id', 'The loan ID to retrieve details for', 'string') }}\"\n}"
+      },
+      "type": "n8n-nodes-base.mongoDbTool",
+      "typeVersion": 1.1,
+      "position": [
+        736,
+        -60
+      ],
+      "id": "0849dfba-676a-431d-8e3b-05944172a28f",
+      "name": "Find Loan By Id",
+      "credentials": {
+        "mongoDb": {
+          "id": "gaTIP4YEnVdTifNs",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "We want one document: risk-related details only for a specific loan.\n",
+        "collection": "loan_applications_demo",
+        "options": {
+          "limit": 1,
+          "projection": "{\n  \"risk_metrics.debt_to_income\": 1,\n  \"risk_metrics.payment_to_income\": 1,\n  \"risk_metrics.existing_emi_ratio\": 1,\n  \"risk_metrics.risk_score\": 1,\n  \"risk_metrics.risk_factors\": 1,\n  \"risk_metrics.mitigating_factors\": 1,\n  \"applicant_details.name\": 1,\n  \"loan_details.amount\": 1,\n  \"application_status\": 1\n}"
+        },
+        "query": "={\n  \"_id\": \"{{ $fromAI('loan_id', 'The loan ID to retrieve details for', 'string') }}\"\n}"
+      },
+      "type": "n8n-nodes-base.mongoDbTool",
+      "typeVersion": 1.1,
+      "position": [
+        856,
+        -60
+      ],
+      "id": "3438631b-2b5e-494e-ad8e-ca8bb008034b",
+      "name": "Risk Analysis Tool",
+      "credentials": {
+        "mongoDb": {
+          "id": "gaTIP4YEnVdTifNs",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are an expert financial analyst AI specializing in loan portfolio analysis, risk assessment, and financial insights. Your mission is to help financial institutions make data-driven decisions by providing comprehensive analysis using the available tools and data.\n\nCORE CAPABILITIES:\n1. Portfolio Analysis: Evaluate overall portfolio health, risk distribution, and key performance indicators\n2. Risk Assessment: Identify high-risk loans, analyze risk patterns, and provide mitigation strategies\n3. Applicant Evaluation: Assess individual applicants based on their financial profile and payment history\n4. Trend Analysis: Identify patterns in loan performance, sector risks, and payment behaviors\n\nAVAILABLE TOOLS:\n1. portfolio_health_dashboard: Generates a comprehensive dashboard of portfolio health metrics including total loan count, portfolio-wide risk assessment, default rates, and approval percentages\n2. semantic_loan_explorer: AI-powered natural language search through loan applications using vector embeddings - finds contextually similar loans based on analyst notes and descriptions\n3. high_risk_loan_detector: Identifies potentially problematic loans by filtering for risk scores above a specified threshold - essential for early intervention and risk management\n4. borrower_profile_search: Find borrowers by their personal details like name, occupation, education, or company - returns comprehensive applicant profiles with financial and risk information\n5. loan_record_finder: Precision search tool for retrieving loan records by specific database fields like ID, reference numbers, or exact field values\n6. portfolio_intelligence_analyzer: Advanced data intelligence tool that performs sophisticated multi-dimensional analysis on loan data including sector risk evaluation, temporal analysis, and risk stratification\n7. repayment_behavior_analyzer: Deep dive analysis of borrower repayment behavior and patterns that reveals payment reliability, delay patterns, and potential early warning signals for default risk\n\nANALYSIS FRAMEWORK:\n1. Context Gathering:\n   - Understand the query intent (portfolio-wide, sector-specific, or applicant-level)\n   - Identify relevant metrics and analysis tools needed\n\n2. Data Collection:\n   - Use appropriate tools to gather relevant data\n   - Ensure comprehensive coverage of required information\n\n3. Analysis & Insights:\n   - Perform multi-dimensional analysis using available tools\n   - Identify patterns, trends, and anomalies\n   - Calculate key risk indicators and performance metrics\n\n4. Recommendations:\n   - Provide actionable insights based on analysis\n   - Suggest risk mitigation strategies when applicable\n   - Highlight areas needing attention or intervention\n\nRESPONSE FORMAT:\n1. For Analysis Results:\n   - Present no JSON in the output\n   - Include summary metrics and detailed breakdowns\n   - Highlight key findings and anomalies\n\n2. For Errors or No Results:\n   - Explain the issue clearly\n   - Suggest alternative approaches\n   - Provide guidance for resolution\n\nBEST PRACTICES:\n1. Always provide context for numerical insights\n2. Highlight both positive trends and areas of concern\n3. Use multiple tools when needed for comprehensive analysis\n4. Maintain professional financial terminology\n5. Focus on actionable insights over raw data\n6. All currency in Indian Rupees (₹)\n7. Keep Indian market terms and conditions in mind"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        648,
+        -280
+      ],
+      "id": "68e7ae1e-d902-4e32-ab94-fe1278987a8d",
+      "name": "Loan Portfolio Agent"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "We want multiple results based on applican's name.\n",
+        "collection": "loan_applications_demo",
+        "options": {
+          "limit": 5,
+          "projection": "{\n  \"_id\":1,\n  \"applicant_details.name\": 1,\n  \"applicant_details.age\": 1,\n  \"applicant_details.occupation\": 1,\n  \"applicant_details.monthly_income\": 1,\n  \"loan_details.amount\": 1,\n  \"application_status\": 1\n}"
+        },
+        "query": "={\n  \"applicant_details.name\": {\n    \"$regex\": \"{{ $fromAI('applicant_name', 'The applicant name to retrieve loan details for', 'string') }}\",\n    \"$options\": \"i\"\n  }\n}"
+      },
+      "type": "n8n-nodes-base.mongoDbTool",
+      "typeVersion": 1.1,
+      "position": [
+        976,
+        -60
+      ],
+      "id": "6acf02ee-1201-48b6-b8eb-de98bfe311b3",
+      "name": "Applicant Search by Applicant Details",
+      "credentials": {
+        "mongoDb": {
+          "id": "gaTIP4YEnVdTifNs",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "advanced_analytics_tool",
+        "description": "Advanced data intelligence tool to perform strategic portfolio analytics such as sector risk analysis, monthly disbursements, and risk band distributions.\n",
+        "workflowId": {
+          "__rl": true,
+          "value": "zHs9ek7ldSdgHZhs",
+          "mode": "list",
+          "cachedResultName": "Advanced Analytics Subflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "metric_type": "={{ $fromAI(\"metric_type\", \"The type of analysis to perform (sector_risk_analysis, monthly_disbursement, risk_band_distribution)\", \"string\") }}\n",
+            "filters": "={{ $fromAI(\"filters\", \"Optional filters for segmentation (MUST be an object, e.g., {\\\"sector\\\": \\\"Retail\\\"})\", \"string\") }}\n"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "metric_type",
+              "displayName": "metric_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.1,
+      "position": [
+        1096,
+        -60
+      ],
+      "id": "4c90783f-dcdc-445a-aeef-886a56b84da3",
+      "name": "advanced_analytics_tool"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "This tool will:\n\t•\tAnalyze payment history for a specific Loan ID.\n\t•\tFind on-time payments, delayed payments, missed payments.\n\t•\tReturn useful repayment behavior.",
+        "collection": "loan_applications_demo",
+        "options": {
+          "limit": 1,
+          "projection": "{\n  \"performance_data.payment_history\": 1\n}"
+        },
+        "query": "={\n  \"_id\": \"{{ $fromAI('loan_id', 'The loan ID to retrieve details for', 'string') }}\"\n}"
+      },
+      "type": "n8n-nodes-base.mongoDbTool",
+      "typeVersion": 1.1,
+      "position": [
+        1216,
+        -60
+      ],
+      "id": "6c6b810c-2733-4c56-8e25-f7bce2af734f",
+      "name": "Payment Analysis Tool",
+      "credentials": {
+        "mongoDb": {
+          "id": "gaTIP4YEnVdTifNs",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Send beautiful HTML emails to email address specified by the user for the data insights fetched as requested by the user",
+        "sendTo": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('To', `Get the email address defined by the user to send the email or send it to sangram.mohite@mongodb.com`, 'string') }}",
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', `Set the subject depending on the context of the email being requested by the user`, 'string') }}",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', `Structured and beautiful HTML email for the data being asked by the user for the insights or loan data`, 'string') }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Loan Portfolio Insights"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        1336,
+        -60
+      ],
+      "id": "b2d536d1-c731-40b0-a38f-e80d352562de",
+      "name": "Gmail",
+      "webhookId": "5b2227c3-2110-4389-9784-93f6f9f0371e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "kLagWuAjmsPpFXDE",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Semantic Loan Explorer",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Semantic Loan Explorer": {
+      "ai_tool": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Portfolio Health Dashboard Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High-Risk Loan Detector Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Loan By Id": {
+      "ai_tool": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Analysis Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Applicant Search by Applicant Details": {
+      "ai_tool": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "advanced_analytics_tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment Analysis Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail": {
+      "ai_tool": [
+        [
+          {
+            "node": "Loan Portfolio Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loan Portfolio Agent": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e654df71-71a9-4907-bd54-e49673ae2cef",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5d79fba4295a54734f1da1f96aed3d59f0e190a451555d1bbbafba9ec284856c"
+  },
+  "id": "ypc7StZodqxE3gP3",
+  "tags": []
+}

@@ -1,0 +1,174 @@
+{
+  "name": "Advanced Analytics Subflow",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const metricType = $input.first().json.metric_type.trim() || '';\nconst filters = $input.first().json.filters || {};\n\nconst transformedFilters = {};\nfor (const [key, value] of Object.entries(filters)) {\n  switch (key) {\n    case 'sector':\n      transformedFilters['applicant_details.sector'] = value;\n      break;\n    case 'loan_category':\n      transformedFilters['loan_details.category'] = value;\n      break;\n    case 'risk_score':\n      transformedFilters['risk_metrics.risk_score'] = value;\n      break;\n    case 'loan_amount':\n      transformedFilters['loan_details.amount'] = value;\n      break;\n    case 'status':\n      transformedFilters['application_status'] = value;\n      break;\n    case 'current_status':\n      transformedFilters['performance_data.current_status'] = value;\n      break;\n    default:\n      transformedFilters[key] = value;\n  }\n}\n\nconst pipeline = [];\n\nif (Object.keys(transformedFilters).length > 0) {\n  pipeline.push({ $match: transformedFilters });\n}\n\nswitch (metricType) {\n  case \"sector_risk_analysis\":\n    pipeline.push(\n      {\n        $group: {\n          _id: \"$applicant_details.sector\",\n          avg_risk_score: { $avg: \"$risk_metrics.risk_score\" },\n          total_loans: { $sum: 1 },\n          total_amount: { $sum: \"$loan_details.amount\" },\n          default_rate: {\n            $avg: {\n              $cond: [\n                { $eq: [\"$performance_data.current_status\", \"defaulted\"] },\n                1,\n                0\n              ]\n            }\n          }\n        }\n      },\n      { $sort: { avg_risk_score: -1 } }\n    );\n    break;\n\n  case \"monthly_disbursement\":\n    pipeline.push(\n      {\n        $group: {\n          _id: {\n            $dateToString: {\n              format: \"%Y-%m\",\n              date: \"$metadata.submission_date\"\n            }\n          },\n          total_amount: { $sum: \"$loan_details.amount\" },\n          count: { $sum: 1 },\n          avg_interest: { $avg: \"$loan_details.interest_rate\" }\n        }\n      },\n      { $sort: { _id: 1 } }\n    );\n    break;\n\n  case \"risk_band_distribution\":\n    pipeline.push(\n      {\n        $bucket: {\n          groupBy: \"$risk_metrics.risk_score\",\n          boundaries: [0, 2, 4, 6, 8, 10],\n          default: \"Unknown\",\n          output: {\n            count: { $sum: 1 },\n            total_amount: { $sum: \"$loan_details.amount\" },\n            avg_interest: { $avg: \"$loan_details.interest_rate\" }\n          }\n        }\n      }\n    );\n    break;\n}\n\nreturn [{ json: { pipeline } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        40,
+        60
+      ],
+      "id": "ebb29491-a2ef-4b80-a660-893e486f586a",
+      "name": "Prepare Advanced Analytics Pipeline"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "metric_type"
+            },
+            {
+              "name": "filters",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -400,
+        -40
+      ],
+      "id": "2dae264a-26c4-4aca-8c08-96d759d7238a",
+      "name": "Trigger Advanced Analytics"
+    },
+    {
+      "parameters": {
+        "operation": "aggregate",
+        "collection": "loan_applications_demo",
+        "query": "={{ $json.pipeline.toJsonString() }}"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        60
+      ],
+      "id": "cc871d99-ea3f-4ed1-bc56-41fa4e8d74d3",
+      "name": "MongoDB",
+      "credentials": {
+        "mongoDb": {
+          "id": "gaTIP4YEnVdTifNs",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b7649019-9c02-4a60-badd-19c0a52134e3",
+              "leftValue": "={{ $json.metric_type }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -180,
+        -40
+      ],
+      "id": "8da0ef14-ba6d-45d4-9608-78d744a6f7c0",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "errorMessage": "metric_type is empty"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        40,
+        -140
+      ],
+      "id": "d61985b0-cc3e-4d7b-8909-77beb160294b",
+      "name": "Stop and Error"
+    }
+  ],
+  "pinData": {
+    "Trigger Advanced Analytics": [
+      {
+        "json": {
+          "metric_type": "monthly_disbursement\n",
+          "filters": {
+            "sector": "Retail"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Trigger Advanced Analytics": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Advanced Analytics Pipeline": {
+      "main": [
+        [
+          {
+            "node": "MongoDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Stop and Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Advanced Analytics Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "afc1a2cb-3268-4c99-9b80-9a160bdd1f78",
+  "meta": {
+    "instanceId": "5d79fba4295a54734f1da1f96aed3d59f0e190a451555d1bbbafba9ec284856c"
+  },
+  "id": "zHs9ek7ldSdgHZhs",
+  "tags": []
+}
